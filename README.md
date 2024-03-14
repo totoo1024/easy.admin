@@ -61,7 +61,7 @@ yarn run build
 >
 > 1、项目所在目录：`/src/frontend/vite-ssr-blog`，基于`vite-plugin-ssr`实现，官方文档：[vite-plugin-ssr](https://cn.vite-plugin-ssr.com/)
 >
-> 2、项目所在目录：`/src/frontend/blog-nuxt`,基于`nuxtjs`实现，官方文档：[Nuxt](https://nuxt.com/)
+> 2、项目所在目录：`/src/frontend/blog-nuxt`,基于`nuxtjs`实现，官方文档：[Nuxt](https://nuxt.com/) （推荐）
 
 ```bash
 # 安装依赖
