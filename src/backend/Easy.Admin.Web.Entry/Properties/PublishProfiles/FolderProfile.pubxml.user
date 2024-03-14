@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+https://go.microsoft.com/fwlink/?LinkID=208121.
+-->
+<Project>
+  <PropertyGroup>
+    <_PublishTargetUrl>D:\资料\Easy.Admin\src\backend\Easy.Admin.Web.Entry\bin\Release\net8.0\publish\</_PublishTargetUrl>
+    <History>True|2024-03-11T03:48:03.6431582Z;True|2024-03-06T18:52:26.4207432+08:00;False|2024-03-06T18:47:25.3207859+08:00;False|2024-03-06T18:27:02.8905815+08:00;True|2024-03-06T18:26:44.1256706+08:00;</History>
+    <LastFailureDetails />
+  </PropertyGroup>
+</Project>

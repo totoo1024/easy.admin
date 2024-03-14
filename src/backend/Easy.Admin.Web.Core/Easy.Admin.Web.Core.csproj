@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <DocumentationFile>Easy.Admin.Web.Core.xml</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="Easy.Admin.Web.Core.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="EasyCaching.Serialization.Json" Version="1.9.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Easy.Admin.Application\Easy.Admin.Application.csproj" />
+  </ItemGroup>
+</Project>

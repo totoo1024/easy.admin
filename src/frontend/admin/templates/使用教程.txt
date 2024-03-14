@@ -1,0 +1,7 @@
+安装全局命令包：npm install -g swagger-typescript-api
+官方文档：https://github.com/acacode/swagger-typescript-api
+参数说明：https://juejin.cn/post/7205198600015003685
+
+# 通过命令将swagger文档快速生产TS类型和axios请求
+命令使用自定义模板生产代码： sta -p http://localhost:5005/swagger/Default/swagger.json -o ./src/apis --modular --route-types --axios --module-name-index 1 --extract-request-params -t ./templates
+本项目快捷命令：yarn run gen

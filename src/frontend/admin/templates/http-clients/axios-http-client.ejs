@@ -1,0 +1,261 @@
+<%
+const { apiConfig, generateResponses, config } = it;
+%>
+
+import type { AxiosInstance, AxiosRequestConfig, HeadersDefaults, ResponseType, AxiosResponse } from "axios";
+import axios from "axios";
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Session } from '/@/utils/storage';
+import qs from 'qs';
+
+export type QueryParamsType = Record<string | number, any>;
+
+// token 键定义
+export const accessTokenKey = 'access-token';
+export const refreshAccessTokenKey = `x-${accessTokenKey}`;
+
+// 清除 token
+export const clearAccessTokens = () => {
+	Session.remove(accessTokenKey);
+	Session.remove(refreshAccessTokenKey);
+};
+
+/**
+ * 解密 JWT token 的信息
+ * @param token jwt token 字符串
+ * @returns <any>object
+ */
+export function decryptJWT(token: string): any {
+	token = token.replace(/_/g, '/').replace(/-/g, '+');
+	var json = decodeURIComponent(escape(window.atob(token.split('.')[1])));
+	return JSON.parse(json);
+}
+
+/**
+ * 将 JWT 时间戳转换成 Date
+ * @description 主要针对 `exp`，`iat`，`nbf`
+ * @param timestamp 时间戳
+ * @returns Date 对象
+ */
+export function getJWTDate(timestamp: number): Date {
+	return new Date(timestamp * 1000);
+}
+
+/**
+ * 检查并存储授权信息
+ * @param res 响应对象
+ */
+export function checkAndStoreAuthentication(res: any): void {
+	// 读取响应报文头 token 信息
+	var accessToken = res.headers[accessTokenKey];
+	var refreshAccessToken = res.headers[refreshAccessTokenKey];
+
+	// 判断是否是无效 token
+	if (accessToken === 'invalid_token') {
+		clearAccessTokens();
+	}
+	// 判断是否存在刷新 token，如果存在则存储在本地
+	else if (refreshAccessToken && accessToken && accessToken !== 'invalid_token') {
+		Session.set(accessTokenKey, accessToken);
+		Session.set(refreshAccessTokenKey, refreshAccessToken);
+	}
+}
+
+export interface FullRequestParams extends Omit<AxiosRequestConfig, "data" | "params" | "url" | "responseType"> {
+  /** set parameter to `true` for call `securityWorker` for this request */
+  secure?: boolean;
+  /** request path */
+  path: string;
+  /** content type of request body */
+  type?: ContentType;
+  /** query params */
+  query?: QueryParamsType;
+  /** format of response (i.e. response.json() -> format: "json") */
+  format?: ResponseType;
+  /** request body */
+  body?: unknown;
+}
+
+export type RequestParams = Omit<FullRequestParams, "body" | "method" | "query" | "path">;
+
+export interface ApiConfig<SecurityDataType = unknown> extends Omit<AxiosRequestConfig, "data" | "cancelToken"> {
+  securityWorker?: (securityData: SecurityDataType | null) => Promise<AxiosRequestConfig | void> | AxiosRequestConfig | void;
+  secure?: boolean;
+  format?: ResponseType;
+}
+
+export enum ContentType {
+  Json = "application/json",
+  FormData = "multipart/form-data",
+  UrlEncoded = "application/x-www-form-urlencoded",
+  Text = "text/plain",
+}
+
+export class HttpClient<SecurityDataType = unknown> {
+    public instance: AxiosInstance;
+    private securityData: SecurityDataType | null = null;
+    private securityWorker?: ApiConfig<SecurityDataType>["securityWorker"];
+    private secure?: boolean;
+    private format?: ResponseType;
+
+    constructor({ securityWorker, secure, format, ...axiosConfig }: ApiConfig<SecurityDataType> = {}) {
+        this.instance = axios.create({ ...axiosConfig, baseURL: axiosConfig.baseURL || "<%~ apiConfig.baseUrl %>" || import.meta.env.VITE_API_URL, timeout: axiosConfig.timeout ?? 50000 })
+        this.secure = secure;
+        this.format = format;
+        this.securityWorker = securityWorker;
+    }
+
+    public setSecurityData = (data: SecurityDataType | null) => {
+        this.securityData = data
+    }
+
+    protected mergeRequestParams(params1: AxiosRequestConfig, params2?: AxiosRequestConfig): AxiosRequestConfig {
+      const method = params1.method || (params2 && params2.method)
+
+      return {
+        ...this.instance.defaults,
+        ...params1,
+        ...(params2 || {}),
+        headers: {
+          ...((method && this.instance.defaults.headers[method.toLowerCase() as keyof HeadersDefaults]) || {}),
+          ...(params1.headers || {}),
+          ...((params2 && params2.headers) || {}),
+        },
+      };
+    }
+
+    protected stringifyFormItem(formItem: unknown) {
+      if (typeof formItem === "object" && formItem !== null) {
+        return JSON.stringify(formItem);
+      } else {
+        return `${formItem}`;
+      }
+    }
+
+    protected createFormData(input: Record<string, unknown>): FormData {
+      return Object.keys(input || {}).reduce((formData, key) => {
+        const property = input[key];
+        const propertyContent: any[] = (property instanceof Array) ? property : [property]
+
+        for (const formItem of propertyContent) {
+          const isFileType = formItem instanceof Blob || formItem instanceof File;
+          formData.append(
+            key,
+            isFileType ? formItem : this.stringifyFormItem(formItem)
+            );
+        }
+
+        return formData;
+      }, new FormData());
+    }
+
+    public request = async <T = any, _E = any>({
+        secure,
+        path,
+        type,
+        query,
+        format,
+        body,
+        ...params
+<% if (config.unwrapResponseData) { %>
+    }: FullRequestParams): Promise<T> => {
+<% } else { %>
+    }: FullRequestParams): Promise<AxiosResponse<T>> => {
+<% } %>
+        const secureParams = ((typeof secure === 'boolean' ? secure : this.secure) && this.securityWorker && (await this.securityWorker(this.securityData))) || {};
+        const requestParams = this.mergeRequestParams(params, secureParams);
+        const responseFormat = (format || this.format) || undefined;
+
+        if (type === ContentType.FormData && body && body !== null && typeof body === "object") {
+          body = this.createFormData(body as Record<string, unknown>);
+        }
+
+        if (type === ContentType.Text && body && body !== null && typeof body !== "string") {
+          body = JSON.stringify(body);
+        }
+
+        // 添加请求拦截器
+        this.instance.interceptors.request.use(
+          (config) => {
+            const accessToken = Session.get<string>(accessTokenKey);
+            if (accessToken) {
+              // 将 token 添加到请求报文头中
+              config.headers!['Authorization'] = `Bearer ${accessToken}`;
+
+              // 判断 accessToken 是否过期
+              const jwt: any = decryptJWT(accessToken);
+              const exp = getJWTDate(jwt.exp as number);
+              //token已过期
+              if (new Date() >= exp) {
+                // 获取刷新 token
+                const refreshAccessToken = Session.get<string>(refreshAccessTokenKey);
+                // 携带刷新 token
+                if (refreshAccessToken) {
+                  config.headers!['X-Authorization'] = `Bearer ${refreshAccessToken}`;
+                }
+              }
+            }
+            return config;
+          },
+          (error) => {
+            // 对请求错误做些什么
+            return Promise.reject(error);
+          }
+        );
+
+        // 添加响应拦截器
+        this.instance.interceptors.response.use(
+          (response) => {
+            // 检查并存储授权信息
+            checkAndStoreAuthentication(response);
+            const res = response.data;
+            if (response.status === 401 || res.statusCode === 401) {
+              clearAccessTokens();
+              window.location.href = '/'; // 去登录页
+              ElMessageBox.alert('您已被登出，请重新登录', '提示', {})
+                .then(() => {})
+                .catch(() => {});
+              return response;
+            }
+            if (res.statusCode === 403) {
+              ElMessage.error('无权访问');
+              return response;
+            }
+            // 处理规范化结果错误
+            if (res.statusCode !== 200) {
+              var message = JSON.stringify(res.errors);
+              ElMessage.error(message);
+            }
+            return response;
+          },
+          (error) => {
+            // 对响应错误做点什么
+            if (error.message.indexOf('timeout') != -1) {
+              ElMessage.error('网络超时');
+            } else if (error.message == 'Network Error') {
+              ElMessage.error('网络连接错误');
+            } else {
+              if (error.response.data) ElMessage.error(error.response.statusText);
+              else ElMessage.error('接口路径找不到');
+            }
+            return Promise.reject(error);
+          }
+        );
+
+        return this.instance.request({
+            ...requestParams,
+            headers: {
+                ...(requestParams.headers || {}),
+                ...(type && type !== ContentType.FormData ? { "Content-Type": type } : {}),
+            },
+            params: query,
+            responseType: responseFormat,
+            data: body,
+            url: path,
+<% if (config.unwrapResponseData) { %>
+        }).then(response => response.data);
+<% } else { %>
+        });
+<% } %>
+    };
+}
