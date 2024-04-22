@@ -245,6 +245,7 @@ const reply = ref<Array<InstanceType<typeof Reply>>>([]);
 const { data } = await CommentApi.list(pager);
 watch(data, () => {
   if (data.value?.succeeded) {
+    emit("getCommentCount", data.value?.data?.total ?? 0);
     state.count = data.value?.data?.total ?? 0;
     state.pages = data.value?.data?.pages ?? 0;
     if (pager.value.pageNo === 1) {
